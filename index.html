@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0284c7" />
+<title>현장 감리 날씨</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="현장날씨" />
+<style>
+  /* ---------- shadcn-style tokens ---------- */
+  :root{
+    --background:#ffffff; --foreground:#0a0a0a;
+    --card:#ffffff; --card-fg:#0a0a0a;
+    --muted:#f4f4f5; --muted-fg:#71717a;
+    --border:#e4e4e7; --input:#e4e4e7;
+    --primary:#18181b; --primary-fg:#fafafa;
+    --accent:#f4f4f5; --ring:#a1a1aa;
+    --radius:12px;
+    --green:#16a34a; --green-bg:#f0fdf4; --green-bd:#bbf7d0;
+    --amber:#d97706; --amber-bg:#fffbeb; --amber-bd:#fde68a;
+    --red:#dc2626;   --red-bg:#fef2f2;   --red-bd:#fecaca;
+    --blue:#2563eb;
+    --shadow:0 1px 2px rgba(0,0,0,.05),0 1px 3px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --background:#09090b; --foreground:#fafafa;
+      --card:#111113; --card-fg:#fafafa;
+      --muted:#1c1c1f; --muted-fg:#a1a1aa;
+      --border:#26262a; --input:#26262a;
+      --primary:#fafafa; --primary-fg:#18181b;
+      --accent:#1c1c1f; --ring:#52525b;
+      --green:#4ade80; --green-bg:#0c1f14; --green-bd:#14532d;
+      --amber:#fbbf24; --amber-bg:#231a06; --amber-bd:#78350f;
+      --red:#f87171;   --red-bg:#2a0f0f;   --red-bd:#7f1d1d;
+      --blue:#60a5fa;
+      --shadow:0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--background);color:var(--foreground);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    -webkit-font-smoothing:antialiased;font-size:15px;line-height:1.5}
+  body{max-width:960px;margin:0 auto;padding:16px 16px 48px;padding-top:max(16px,env(safe-area-inset-top))}
+  svg.ic{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.125em;flex:none}
+
+  /* ---------- header ---------- */
+  header{display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
+  .titlebar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .titlebar h1{font-size:17px;font-weight:650;display:flex;align-items:center;gap:8px}
+  .titlebar h1 svg{font-size:20px;color:var(--muted-fg)}
+  .toolbar{display:flex;gap:8px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    height:38px;padding:0 12px;border:1px solid var(--border);background:var(--card);
+    color:var(--foreground);border-radius:10px;font-size:14px;font-weight:550;cursor:pointer;
+    box-shadow:var(--shadow);transition:.12s}
+  .btn:hover{background:var(--muted)}
+  .btn:active{transform:scale(.97)}
+  .btn.icon{width:38px;padding:0;font-size:17px}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+  .seg button{border:0;background:var(--card);color:var(--muted-fg);height:38px;width:44px;font-size:14px;font-weight:650;cursor:pointer}
+  .seg button.on{background:var(--primary);color:var(--primary-fg)}
+
+  /* search */
+  .searchwrap{position:relative}
+  .searchbox{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;
+    border:1px solid var(--input);background:var(--card);border-radius:12px;box-shadow:var(--shadow)}
+  .searchbox svg{color:var(--muted-fg);font-size:18px}
+  .searchbox input{flex:1;border:0;outline:0;background:transparent;color:var(--foreground);font-size:15px}
+  .results{position:absolute;top:50px;left:0;right:0;z-index:30;background:var(--card);
+    border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.18);overflow:hidden;display:none}
+  .results.show{display:block}
+  .results button{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;
+    border:0;background:transparent;color:var(--foreground);padding:10px 14px;cursor:pointer}
+  .results button:hover{background:var(--muted)}
+  .results .r1{font-weight:600;font-size:14px}
+  .results .r2{font-size:12px;color:var(--muted-fg)}
+
+  /* site presets */
+  .sites{display:flex;gap:8px;flex-wrap:wrap}
+  .sites button{flex:1;min-width:88px;height:40px;border:1px solid var(--border);
+    background:var(--card);color:var(--foreground);border-radius:10px;font-size:13px;
+    font-weight:600;cursor:pointer;box-shadow:var(--shadow);display:flex;align-items:center;
+    justify-content:center;gap:5px;transition:.12s}
+  .sites button svg{font-size:14px;color:var(--muted-fg)}
+  .sites button:active{transform:scale(.97)}
+  .sites button.on{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+  .sites button.on svg{color:var(--primary-fg)}
+
+  /* cards */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:16px}
+  .grid{display:grid;gap:14px}
+  .card-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;
+    color:var(--muted-fg);text-transform:none;margin-bottom:12px;letter-spacing:.01em}
+  .card-title svg{font-size:16px}
+
+  /* hero (current) */
+  .hero{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;align-items:center}
+  .hero .now{display:flex;align-items:center;gap:14px}
+  .hero .bigicon{font-size:60px;color:var(--foreground)}
+  .hero .temp{font-size:52px;font-weight:600;line-height:1}
+  .hero .temp small{font-size:22px;color:var(--muted-fg);font-weight:500}
+  .hero .cond{font-size:15px;color:var(--muted-fg);margin-top:4px}
+  .hero .place{font-size:13px;color:var(--muted-fg);display:flex;align-items:center;gap:5px;margin-bottom:6px}
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .metric{display:flex;align-items:center;gap:9px;background:var(--muted);border-radius:10px;padding:10px 12px}
+  .metric svg{font-size:18px;color:var(--muted-fg)}
+  .metric .k{font-size:11px;color:var(--muted-fg)}
+  .metric .v{font-size:15px;font-weight:600}
+
+  /* judgement badges */
+  .judge-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .judge{border-radius:11px;padding:12px;border:1px solid var(--border);background:var(--muted)}
+  .judge .jt{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;margin-bottom:6px}
+  .judge .jt svg{font-size:16px}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;
+    padding:3px 9px;border-radius:999px;border:1px solid transparent}
+  .badge svg{font-size:13px}
+  .b-green{color:var(--green);background:var(--green-bg);border-color:var(--green-bd)}
+  .b-amber{color:var(--amber);background:var(--amber-bg);border-color:var(--amber-bd)}
+  .b-red{color:var(--red);background:var(--red-bg);border-color:var(--red-bd)}
+  .judge .jd{font-size:11.5px;color:var(--muted-fg);margin-top:6px;line-height:1.45}
+
+  /* hourly scroller */
+  .hscroll{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  .hscroll::-webkit-scrollbar{height:6px}
+  .hscroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  .hour{scroll-snap-align:start;flex:none;width:66px;text-align:center;background:var(--muted);
+    border:1px solid var(--border);border-radius:11px;padding:10px 6px;display:flex;flex-direction:column;gap:4px;align-items:center}
+  .hour.now{outline:2px solid var(--ring)}
+  .hour .h-t{font-size:11px;color:var(--muted-fg);font-weight:600}
+  .hour .h-i{font-size:22px}
+  .hour .h-temp{font-size:15px;font-weight:650}
+  .hour .h-pop{font-size:10.5px;color:var(--blue);font-weight:600;display:flex;align-items:center;gap:2px;justify-content:center;min-height:14px}
+  .hour .h-wind{font-size:10.5px;color:var(--muted-fg)}
+  .wdot{width:8px;height:8px;border-radius:50%;margin-top:2px}
+  .wdot.g{background:var(--green)} .wdot.a{background:var(--amber)} .wdot.r{background:var(--red)}
+
+  /* 7 day */
+  .day{display:grid;grid-template-columns:64px 30px 1fr auto;gap:12px;align-items:center;
+    padding:11px 4px;border-top:1px solid var(--border)}
+  .day:first-child{border-top:0}
+  .day .d-name{font-size:14px;font-weight:600}
+  .day .d-name small{display:block;font-size:11px;color:var(--muted-fg);font-weight:400}
+  .day .d-icon{font-size:22px;text-align:center}
+  .day .d-mid{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .day .d-tags{display:flex;gap:6px;flex-wrap:wrap}
+  .tag{font-size:11px;color:var(--muted-fg);display:inline-flex;align-items:center;gap:3px}
+  .tag svg{font-size:12px}
+  .tag.rain{color:var(--blue)}
+  .day .d-temp{text-align:right;font-size:14px;font-weight:600;white-space:nowrap}
+  .day .d-temp small{color:var(--muted-fg);font-weight:400}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted-fg);margin-top:10px;align-items:center}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .footer{margin-top:18px;text-align:center;font-size:11px;color:var(--muted-fg);line-height:1.6}
+  .footer a{color:var(--muted-fg)}
+  .updated{font-size:11px;color:var(--muted-fg)}
+
+  .skeleton{color:var(--muted-fg);text-align:center;padding:40px 0;font-size:14px}
+  .err{color:var(--red);text-align:center;padding:24px 0;font-size:14px}
+
+  @media (max-width:560px){
+    .hero{grid-template-columns:1fr;gap:14px}
+    .judge-grid{grid-template-columns:1fr}
+    .hero .temp{font-size:46px}
+    .day{grid-template-columns:56px 26px 1fr auto;gap:8px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titlebar">
+    <h1><svg class="ic" id="i-hardhat"></svg>현장 감리 날씨</h1>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="단위">
+        <button id="unitC" class="on">°C</button>
+        <button id="unitF">°F</button>
+      </div>
+      <button class="btn icon" id="refresh" title="새로고침" aria-label="새로고침"><svg class="ic" id="i-refresh"></svg></button>
+    </div>
+  </div>
+  <div class="searchwrap">
+    <div class="searchbox">
+      <svg class="ic" id="i-pin"></svg>
+      <input id="search" type="search" placeholder="현장 위치 검색 (예: 아산 영인, 천안, 대전…)" autocomplete="off" />
+      <svg class="ic" id="i-search"></svg>
+    </div>
+    <div class="results" id="results"></div>
+  </div>
+  <div class="sites" id="sites"></div>
+</header>
+
+<main class="grid" id="app">
+  <div class="card"><div class="skeleton" id="boot">날씨를 불러오는 중…</div></div>
+</main>
+
+<div class="footer">
+  데이터: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · 무료 · API키 불필요<br/>
+  작업 가부 판정은 참고용입니다. 실제 타설·고소작업 중지 여부는 현장 안전관리자/시방기준에 따르세요.
+</div>
+
+<script>
+/* ================= lucide icons (inline SVG paths) ================= */
+const ICONS = {
+  hardhat:'<path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><path d="M14 6a6 6 0 0 1 6 6v3"/>',
+  refresh:'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  pin:'<path d="M20 10c0 4.4-8 12-8 12s-8-7.6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  thermometer:'<path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>',
+  droplets:'<path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 4.24 7 2c-.29 2.24-1.14 4.13-2.29 5.06S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/>',
+  wind:'<path d="M12.8 19.6A2 2 0 1 0 14 16H2"/><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"/><path d="M9.8 4.4A2 2 0 1 1 11 8H2"/>',
+  gauge:'<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+  cloud:'<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  cloudsun:'<path d="M12 2v2M5.22 5.22l1.42 1.42M20 12h2M15.34 3.34l-1.42 1.42M17.66 8.34a4 4 0 1 0-4.32 4.32"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/>',
+  cloudrain:'<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 14v6M8 14v6M12 16v6"/>',
+  clouddrizzle:'<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M8 19v1M8 14v1M16 19v1M16 14v1M12 21v1M12 16v1"/>',
+  snow:'<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M8 15h.01M8 19h.01M12 17h.01M12 21h.01M16 15h.01M16 19h.01"/>',
+  fog:'<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 17H7M17 21H9"/>',
+  lightning:'<path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 1.5 8.742"/><path d="m13 12-3 5h4l-3 5"/>',
+  sunrise:'<path d="M12 2v6M4.93 10.93l1.41 1.41M2 18h2M20 18h2M17.66 12.34l1.41-1.41M22 22H2M8 6l4-4 4 4M16 18a4 4 0 0 0-8 0"/>',
+  sunset:'<path d="M12 10V2M4.93 10.93l1.41 1.41M2 18h2M20 18h2M17.66 12.34l1.41-1.41M22 22H2M16 6l-4 4-4-4M16 18a4 4 0 0 0-8 0"/>',
+  clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  calendar:'<path d="M8 2v4M16 2v4M3 10h18"/><rect width="18" height="18" x="3" y="4" rx="2"/>',
+  check:'<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>',
+  alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/>',
+  x:'<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/>',
+  layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>',
+  roller:'<rect width="16" height="6" x="2" y="2" rx="2"/><path d="M10 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 0 2-2V7"/><rect width="4" height="6" x="8" y="16" rx="1"/>',
+  crane:'<path d="M10 3h6l4 4M10 3v18M10 3 3 8M20 7v4M20 7l-6 2M6 21h8M14 11v4"/>'
+};
+function svg(name){return '<svg class="ic" viewBox="0 0 24 24">'+(ICONS[name]||'')+'</svg>';}
+// inject header/search icons
+document.getElementById('i-hardhat').outerHTML = svg('hardhat').replace('class="ic"','class="ic"');
+document.getElementById('i-refresh').outerHTML = svg('refresh');
+document.getElementById('i-pin').outerHTML = svg('pin');
+document.getElementById('i-search').outerHTML = svg('search');
+
+/* ================= weather code → label / icon ================= */
+function wmo(code){
+  const m={
+    0:['맑음','sun'],1:['대체로 맑음','cloudsun'],2:['구름 조금','cloudsun'],3:['흐림','cloud'],
+    45:['안개','fog'],48:['서리 안개','fog'],
+    51:['약한 이슬비','clouddrizzle'],53:['이슬비','clouddrizzle'],55:['강한 이슬비','clouddrizzle'],
+    56:['어는 이슬비','clouddrizzle'],57:['어는 이슬비','clouddrizzle'],
+    61:['약한 비','cloudrain'],63:['비','cloudrain'],65:['강한 비','cloudrain'],
+    66:['어는 비','cloudrain'],67:['어는 비','cloudrain'],
+    71:['약한 눈','snow'],73:['눈','snow'],75:['강한 눈','snow'],77:['싸락눈','snow'],
+    80:['약한 소나기','cloudrain'],81:['소나기','cloudrain'],82:['강한 소나기','cloudrain'],
+    85:['눈 소나기','snow'],86:['강한 눈 소나기','snow'],
+    95:['뇌우','lightning'],96:['뇌우·우박','lightning'],99:['강한 뇌우','lightning']
+  };
+  return m[code]||['—','cloud'];
+}
+
+/* ================= units ================= */
+let UNIT = localStorage.getItem('unit')||'C';
+function tconv(c){ return UNIT==='F' ? c*9/5+32 : c; }
+function tstr(c,dec=0){ if(c==null||isNaN(c))return '—'; return Math.round(tconv(c)*(dec?10:1))/(dec?10:1)+'°'; }
+
+/* ================= 감리 판정 로직 ================= */
+// 콘크리트 타설
+function judgePour(precipProb, precip, temp){
+  if(precip>=0.5 || precipProb>=60) return ['red','타설 불가','강수(예상)로 타설 중지. 이미 친 부위는 비닐 양생 보양'];
+  if(precip>=0.1 || precipProb>=30) return ['amber','주의','강수 가능성. 타설 시 보양자재·배수 준비'];
+  if(temp<4) return ['amber','한중 대책','기온 4℃ 미만 — 한중 콘크리트(보온양생·초기동해 주의)'];
+  if(temp>30) return ['amber','서중 대책','기온 30℃ 초과 — 서중 콘크리트(살수·타설시간 조정)'];
+  return ['green','양호','타설 여건 양호'];
+}
+// 도장 / 방수
+function judgePaint(precip, humidity, temp){
+  if(precip>=0.1) return ['red','도장·방수 불가','강수 시 도막 불량. 작업 중지'];
+  if(humidity>=85) return ['red','불가','습도 85% 이상 — 결로·백화 우려'];
+  if(temp<5||temp>35) return ['amber','부적합','도장 적정온도 5~35℃ 벗어남'];
+  if(humidity>=80) return ['amber','주의','습도 높음(80%↑) — 건조 지연 주의'];
+  return ['green','양호','도장·방수 여건 양호'];
+}
+// 고소작업 / 타워크레인 (산업안전보건기준 규칙: 풍속·악천후)
+function judgeCrane(gust, precip, snow){
+  precip=precip||0; snow=snow||0;
+  if(gust>=15) return ['red','운전 중지','순간풍속 15㎧↑ — 크레인 운전·고소작업 중지'];
+  if(snow>=1)  return ['red','작업 중지','강설 1㎝/h↑ — 악천후, 고소·크레인 중지'];
+  if(precip>=1) return ['red','작업 중지','강우 1㎜/h↑ — 악천후, 고소작업 중지'];
+  if(gust>=10) return ['amber','설치·해체 중지','순간풍속 10㎧↑ — 크레인 설치/해체·고소 주의'];
+  return ['green','양호','풍속·기상 여건 양호'];
+}
+// 기온 / 양생 일반
+function judgeTemp(tmin,tmax){
+  if(tmin<0) return ['red','동결 주의','최저 0℃ 미만 — 동해·미장 동결 주의'];
+  if(tmin<4) return ['amber','한중 관리','최저 4℃ 미만 — 초기 양생 보온 필요'];
+  if(tmax>33) return ['amber','폭염 관리','최고 33℃ 초과 — 온열질환·서중 대책'];
+  return ['green','양호','기온 여건 양호'];
+}
+function badge([lvl,txt]){const ic=lvl==='green'?'check':lvl==='amber'?'alert':'x';
+  return '<span class="badge b-'+lvl+'">'+svg(ic)+txt+'</span>';}
+function worst(...lvls){ if(lvls.includes('red'))return 'r'; if(lvls.includes('amber'))return 'a'; return 'g';}
+
+/* ================= state ================= */
+// 현장 프리셋 (좌표는 근사값 — 필요시 검색으로 미세조정 가능. 인접 현장이라 날씨는 거의 동일)
+const SITES=[
+  {label:'터널관리소', name:'영인산터널관리사무소', admin:'충남 아산시 영인면', latitude:36.8506, longitude:126.9786},
+  {label:'부변전실',   name:'부변전실',           admin:'충남 아산시 영인면', latitude:36.8506, longitude:126.9786},
+  {label:'제설창고',   name:'서아산제설자재창고',  admin:'충남 아산시 인주면', latitude:36.8330, longitude:126.9200}
+];
+let LOC = JSON.parse(localStorage.getItem('loc')||'null') || {...SITES[0]};
+let DATA=null;
+
+function renderSites(){
+  const el=document.getElementById('sites');
+  el.innerHTML=SITES.map((s,i)=>'<button data-si="'+i+'">'+svg('pin')+s.label+'</button>').join('');
+  el.querySelectorAll('button[data-si]').forEach(b=>{
+    const s=SITES[+b.dataset.si];
+    if(s.name===LOC.name) b.classList.add('on');
+    b.addEventListener('click',()=>{
+      LOC={name:s.name,admin:s.admin,latitude:s.latitude,longitude:s.longitude};
+      localStorage.setItem('loc',JSON.stringify(LOC));
+      renderSites(); loadWeather();
+    });
+  });
+}
+
+/* ================= fetch ================= */
+async function geocode(q){
+  const u='https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(q)+'&count=6&language=ko&format=json';
+  const r=await fetch(u); const j=await r.json(); return j.results||[];
+}
+async function loadWeather(){
+  const app=document.getElementById('app');
+  app.innerHTML='<div class="card"><div class="skeleton">'+LOC.name+' 날씨 불러오는 중…</div></div>';
+  const u='https://api.open-meteo.com/v1/forecast'
+    +'?latitude='+LOC.latitude+'&longitude='+LOC.longitude
+    +'&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_gusts_10m'
+    +'&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,snowfall,weather_code,wind_speed_10m,wind_gusts_10m'
+    +'&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,sunrise,sunset'
+    +'&timezone=auto&forecast_days=7&wind_speed_unit=ms&temperature_unit=celsius&precipitation_unit=mm';
+  try{
+    const r=await fetch(u); if(!r.ok)throw new Error('HTTP '+r.status);
+    DATA=await r.json(); render();
+  }catch(e){
+    app.innerHTML='<div class="card"><div class="err">날씨를 불러오지 못했습니다.<br/>인터넷 연결을 확인하고 새로고침해 주세요.<br/><small>'+e.message+'</small></div></div>';
+  }
+}
+
+/* ================= render ================= */
+function fmtTime(iso){const d=new Date(iso);let h=d.getHours();const ap=h<12?'오전':'오후';let hh=h%12;if(hh===0)hh=12;return ap+' '+hh+'시';}
+function fmtHourShort(iso){const d=new Date(iso);let h=d.getHours();return (h<10?'0':'')+h+'시';}
+function dayName(iso,idx){const d=new Date(iso);const w=['일','월','화','수','목','금','토'][d.getDay()];
+  const label=idx===0?'오늘':idx===1?'내일':(d.getMonth()+1)+'/'+d.getDate();
+  return {top:label,bot:'('+w+')'};}
+
+function render(){
+  const c=DATA.current, h=DATA.hourly, d=DATA.daily;
+  const [clabel,cicon]=wmo(c.weather_code);
+
+  // find current hour index
+  const now=new Date(); let start=0;
+  for(let i=0;i<h.time.length;i++){ if(new Date(h.time[i])>=new Date(now.getTime()-3600000)){start=i;break;} }
+
+  // 오늘(현재시각 기준 24시간) 최악값으로 판정
+  // 강수·풍속·기온은 24시간 전체, 도장 습도는 작업시간대(08~17시)만 반영
+  let popMax=0,precMax=0,tMin=999,tMax=-999,gustMax=0,humWork=0,precWork=0,snowMax=0;
+  for(let i=start;i<Math.min(start+24,h.time.length);i++){
+    popMax=Math.max(popMax,h.precipitation_probability[i]||0);
+    precMax=Math.max(precMax,h.precipitation[i]||0);
+    snowMax=Math.max(snowMax,(h.snowfall?h.snowfall[i]:0)||0);
+    tMin=Math.min(tMin,h.temperature_2m[i]); tMax=Math.max(tMax,h.temperature_2m[i]);
+    gustMax=Math.max(gustMax,h.wind_gusts_10m[i]||0);
+    const hr=new Date(h.time[i]).getHours();
+    if(hr>=8 && hr<=17){
+      humWork=Math.max(humWork,h.relative_humidity_2m[i]||0);
+      precWork=Math.max(precWork,h.precipitation[i]||0);
+    }
+  }
+  const jPour=judgePour(popMax,precMax,tMin<-100?c.temperature_2m:tMin);
+  const jPaint=judgePaint(precWork,humWork,c.temperature_2m);
+  const jCrane=judgeCrane(Math.max(gustMax,c.wind_gusts_10m||0), precMax, snowMax);
+  const jTemp=judgeTemp(tMin,tMax);
+
+  // hourly cards (next 24h)
+  let hourHTML='';
+  for(let i=start;i<Math.min(start+24,h.time.length);i++){
+    const [,hi]=wmo(h.weather_code[i]);
+    const g=h.wind_gusts_10m[i]||0;
+    const wd=g>=15?'r':g>=10?'a':(h.precipitation[i]>=0.5||h.precipitation_probability[i]>=60)?'r':(h.precipitation_probability[i]>=30)?'a':'g';
+    const pop=h.precipitation_probability[i];
+    hourHTML+='<div class="hour'+(i===start?' now':'')+'">'
+      +'<div class="h-t">'+(i===start?'지금':fmtHourShort(h.time[i]))+'</div>'
+      +'<div class="h-i">'+svg(hi)+'</div>'
+      +'<div class="h-temp">'+tstr(h.temperature_2m[i])+'</div>'
+      +'<div class="h-pop">'+(pop>0?svg('droplets')+pop+'%':'')+'</div>'
+      +'<div class="h-wind">'+(h.wind_speed_10m[i].toFixed(0))+'㎧</div>'
+      +'<div class="wdot '+wd+'"></div>'
+    +'</div>';
+  }
+
+  // 7 day
+  let dayHTML='';
+  for(let i=0;i<d.time.length;i++){
+    const [,di]=wmo(d.weather_code[i]);
+    const nm=dayName(d.time[i],i);
+    const jp=judgePour(d.precipitation_probability_max[i],d.precipitation_sum[i], d.temperature_2m_min[i]);
+    const jc=judgeCrane(d.wind_gusts_10m_max[i]);
+    const w=worst(jp[0],jc[0],judgeTemp(d.temperature_2m_min[i],d.temperature_2m_max[i])[0]);
+    const wlabel=w==='r'?['b-red','작업 제한']:w==='a'?['b-amber','부분 주의']:['b-green','작업 양호'];
+    dayHTML+='<div class="day">'
+      +'<div class="d-name">'+nm.top+'<small>'+nm.bot+'</small></div>'
+      +'<div class="d-icon">'+svg(di)+'</div>'
+      +'<div class="d-mid"><div class="d-tags">'
+        +'<span class="badge '+wlabel[0]+'" style="font-size:11px;padding:2px 7px">'+wlabel[1]+'</span>'
+        +'<span class="tag rain">'+svg('droplets')+d.precipitation_probability_max[i]+'% · '+d.precipitation_sum[i].toFixed(1)+'㎜</span>'
+        +'<span class="tag">'+svg('wind')+d.wind_gusts_10m_max[i].toFixed(0)+'㎧</span>'
+      +'</div></div>'
+      +'<div class="d-temp">'+tstr(d.temperature_2m_max[i])+' <small>/ '+tstr(d.temperature_2m_min[i])+'</small></div>'
+    +'</div>';
+  }
+
+  const updated=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+  const sr=new Date(d.sunrise[0]).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+  const ss=new Date(d.sunset[0]).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+
+  document.getElementById('app').innerHTML=`
+    <!-- 현재 -->
+    <div class="card">
+      <div class="hero">
+        <div>
+          <div class="place">${svg('pin')} ${LOC.name}${LOC.admin?' · '+LOC.admin:''}</div>
+          <div class="now">
+            <span class="bigicon">${svg(cicon)}</span>
+            <div>
+              <div class="temp">${tstr(c.temperature_2m)}<small> ${clabel}</small></div>
+              <div class="cond">체감 ${tstr(c.apparent_temperature)} · 업데이트 ${updated}</div>
+            </div>
+          </div>
+        </div>
+        <div class="metrics">
+          <div class="metric">${svg('droplets')}<div><div class="k">강수 · 습도</div><div class="v">${c.precipitation.toFixed(1)}㎜ · ${c.relative_humidity_2m}%</div></div></div>
+          <div class="metric">${svg('wind')}<div><div class="k">풍속 · 순간</div><div class="v">${c.wind_speed_10m.toFixed(1)} · ${c.wind_gusts_10m.toFixed(1)}㎧</div></div></div>
+          <div class="metric">${svg('sunrise')}<div><div class="k">일출</div><div class="v">${sr}</div></div></div>
+          <div class="metric">${svg('sunset')}<div><div class="k">일몰</div><div class="v">${ss}</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 오늘 감리 작업 판정 -->
+    <div class="card">
+      <div class="card-title">${svg('hardhat')} 오늘 작업 가부 판정 <span style="font-weight:400;color:var(--muted-fg)">· 향후 24시간 기준</span></div>
+      <div class="judge-grid">
+        <div class="judge"><div class="jt">${svg('layers')} 콘크리트 타설 ${badge(jPour)}</div><div class="jd">${jPour[2]} · 최대 강수확률 ${popMax}%, 강수 ${precMax.toFixed(1)}㎜</div></div>
+        <div class="judge"><div class="jt">${svg('roller')} 도장·방수 ${badge(jPaint)}</div><div class="jd">${jPaint[2]} · 작업시간 최고 습도 ${humWork}%</div></div>
+        <div class="judge"><div class="jt">${svg('crane')} 고소·크레인 ${badge(jCrane)}</div><div class="jd">${jCrane[2]} · 최대 순간풍속 ${Math.max(gustMax,c.wind_gusts_10m).toFixed(1)}㎧${snowMax>0?', 적설 '+snowMax.toFixed(1)+'㎝':''}</div></div>
+        <div class="judge"><div class="jt">${svg('thermometer')} 기온·양생 ${badge(jTemp)}</div><div class="jd">${jTemp[2]} · 오늘 ${tstr(tMax)} / ${tstr(tMin)}</div></div>
+      </div>
+    </div>
+
+    <!-- 시간별 24h -->
+    <div class="card">
+      <div class="card-title">${svg('clock')} 시간별 예보 · 향후 24시간</div>
+      <div class="hscroll">${hourHTML}</div>
+      <div class="legend">
+        <span><span class="wdot g"></span>작업 양호</span>
+        <span><span class="wdot a"></span>주의(강수/풍속)</span>
+        <span><span class="wdot r"></span>작업 제한</span>
+        <span>${svg('droplets')}강수확률 · ㎧ 풍속</span>
+      </div>
+    </div>
+
+    <!-- 7일 -->
+    <div class="card">
+      <div class="card-title">${svg('calendar')} 7일 예보 · 작업 적합도</div>
+      ${dayHTML}
+    </div>
+  `;
+}
+
+/* ================= events ================= */
+let searchTimer=null;
+const searchEl=document.getElementById('search');
+const resultsEl=document.getElementById('results');
+searchEl.addEventListener('input',()=>{
+  clearTimeout(searchTimer);
+  const q=searchEl.value.trim();
+  if(q.length<2){resultsEl.classList.remove('show');return;}
+  searchTimer=setTimeout(async()=>{
+    try{
+      const res=await geocode(q);
+      if(!res.length){resultsEl.innerHTML='<button disabled style="color:var(--muted-fg)">검색 결과 없음</button>';resultsEl.classList.add('show');return;}
+      resultsEl.innerHTML=res.map((r,idx)=>{
+        const admin=[r.admin1,r.admin2,r.admin3].filter(Boolean).join(' ');
+        return '<button data-i="'+idx+'"><span class="r1">'+r.name+'</span><span class="r2">'+(r.country||'')+(admin?' · '+admin:'')+'</span></button>';
+      }).join('');
+      resultsEl.classList.add('show');
+      resultsEl.querySelectorAll('button[data-i]').forEach(b=>b.addEventListener('click',()=>{
+        const r=res[+b.dataset.i];
+        const admin=[r.admin1,r.admin2,r.admin3].filter(Boolean).join(' ');
+        LOC={name:r.name,admin:admin,latitude:r.latitude,longitude:r.longitude};
+        localStorage.setItem('loc',JSON.stringify(LOC));
+        resultsEl.classList.remove('show'); searchEl.value='';
+        renderSites(); loadWeather();
+      }));
+    }catch(e){}
+  },350);
+});
+document.addEventListener('click',e=>{ if(!e.target.closest('.searchwrap')) resultsEl.classList.remove('show'); });
+
+document.getElementById('refresh').addEventListener('click',loadWeather);
+function setUnit(u){
+  UNIT=u; localStorage.setItem('unit',u);
+  document.getElementById('unitC').classList.toggle('on',u==='C');
+  document.getElementById('unitF').classList.toggle('on',u==='F');
+  if(DATA)render();
+}
+document.getElementById('unitC').addEventListener('click',()=>setUnit('C'));
+document.getElementById('unitF').addEventListener('click',()=>setUnit('F'));
+setUnit(UNIT);
+renderSites();
+loadWeather();
+
+/* PWA service worker (HTTPS/localhost에서만 동작, file://에선 조용히 무시) */
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>
