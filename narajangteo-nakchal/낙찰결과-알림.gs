@@ -43,8 +43,9 @@ var LOOKBACK_HOURS = 26;
 var INQRY_DIV = 2;
 
 // 엔드포인트 후보(위→아래 순으로 시도, 먼저 성공하는 것 사용)
+// ※ 진단 결과 /as/ 경로가 정답(403=권한). 낙찰정보서비스 활용신청 승인 후 동작함.
 var BASE_CANDIDATES = [
-  'https://apis.data.go.kr/1230000/ad/ScsbidInfoService/',
+  'https://apis.data.go.kr/1230000/as/ScsbidInfoService/',
   'https://apis.data.go.kr/1230000/ScsbidInfoService/'
 ];
 // 카테고리별 오퍼레이션 후보(위→아래 순으로 시도). 낙찰현황이 없으면 개찰결과로 폴백.
