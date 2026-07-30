@@ -274,33 +274,53 @@ function setupScsbidTrigger() {
 }
 
 
-/** 진단: 낙찰 API 응답 + 실제 필드명 확인. 결과를 "이메일로" 보냄(로그 찾을 필요 없음) */
+/** 진단: 낙찰 API의 올바른 base/오퍼레이션/파라미터 조합을 자동으로 쓸어봄. 결과를 이메일로 발송 */
 function pingScsbid() {
   var now = new Date();
-  var bgn = new Date(now.getTime() - LOOKBACK_HOURS * 3600 * 1000);
-  var ops = OP_CNSTWK.concat(OP_SERVC);
+  var d3  = new Date(now.getTime() - 3 * 24 * 3600 * 1000);  // 최근 3일
+  var bgn8  = ymd_(d3),  end8  = ymd_(now);    // YYYYMMDD (날짜만)
+  var bgn12 = fmt(d3),   end12 = fmt(now);     // YYYYMMDDHHmm (분까지)
+
+  var bases = [
+    'https://apis.data.go.kr/1230000/as/ScsbidInfoService/',  // 낙찰서비스 신규 접두어 후보
+    'https://apis.data.go.kr/1230000/ScsbidInfoService/'      // 무접두어(500 났던 경로)
+  ];
+  var ops = ['getScsbidListSttusCnstwk', 'getOpengResultListInfoCnstwk'];
+  // (inqryDiv, 시작, 끝, 설명) 조합
+  var combos = [
+    ['1', bgn8,  end8,  'div1·날짜8'],
+    ['1', bgn12, end12, 'div1·분12'],
+    ['2', bgn8,  end8,  'div2·날짜8']
+  ];
+
   var out = '';
-  for (var b = 0; b < BASE_CANDIDATES.length; b++) {
+  for (var b = 0; b < bases.length; b++) {
     for (var o = 0; o < ops.length; o++) {
-      var url = BASE_CANDIDATES[b] + ops[o]
-        + '?serviceKey=' + encodeURIComponent(SERVICE_KEY)
-        + '&pageNo=1&numOfRows=1&inqryDiv=' + INQRY_DIV
-        + '&inqryBgnDt=' + fmt(bgn) + '&inqryEndDt=' + fmt(now) + '&type=json';
-      out += '======================================================\n';
-      out += ops[o] + '  @  ' + BASE_CANDIDATES[b] + '\n';
-      try {
-        var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-        out += 'HTTP ' + r.getResponseCode() + '\n';
-        out += r.getContentText().substring(0, 1500) + '\n\n';
-      } catch (e) {
-        out += '예외: ' + e + '\n\n';
+      for (var c = 0; c < combos.length; c++) {
+        var cb = combos[c];
+        var url = bases[b] + ops[o]
+          + '?serviceKey=' + encodeURIComponent(SERVICE_KEY)
+          + '&pageNo=1&numOfRows=1&inqryDiv=' + cb[0]
+          + '&inqryBgnDt=' + cb[1] + '&inqryEndDt=' + cb[2] + '&type=json';
+        var tag = (b === 0 ? 'as/' : '무접두') + ' | ' + ops[o].replace('getScsbidListSttus','낙찰현황.').replace('getOpengResultListInfo','개찰결과.') + ' | ' + cb[3];
+        try {
+          var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+          var code = r.getResponseCode();
+          var body = r.getContentText();
+          out += '[' + code + '] ' + tag + '\n';
+          if (code === 200) out += body.substring(0, 1200) + '\n';   // 성공 조합은 원문(필드명 확인용)
+          else              out += '   ' + body.substring(0, 120) + '\n';
+          out += '------------------------------------------------------\n';
+        } catch (e) {
+          out += '[예외] ' + tag + ' : ' + e + '\n------------------------------------------------------\n';
+        }
       }
     }
   }
   MailApp.sendEmail({
     to: RECIPIENT,
-    subject: '[낙찰 진단] pingScsbid 결과 ' + ymd(now),
-    htmlBody: '<p>아래 내용을 Claude 채팅에 붙여넣어 주세요.</p><pre style="font-size:12px;white-space:pre-wrap;word-break:break-all">' + esc_(out) + '</pre>'
+    subject: '[낙찰 진단2] pingScsbid 결과 ' + ymd(now),
+    htmlBody: '<p>아래 내용을 Claude 채팅에 붙여넣어 주세요. (200 뜬 조합이 정답입니다)</p><pre style="font-size:12px;white-space:pre-wrap;word-break:break-all">' + esc_(out) + '</pre>'
   });
   Logger.log('진단 메일 발송 완료 → ' + RECIPIENT);
 }
