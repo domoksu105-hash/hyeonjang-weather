@@ -274,24 +274,33 @@ function setupScsbidTrigger() {
 }
 
 
-/** 진단: 낙찰 API가 정상 응답하는지 + 실제 필드명 확인 (한 번 실행 후 보기>로그) */
+/** 진단: 낙찰 API 응답 + 실제 필드명 확인. 결과를 "이메일로" 보냄(로그 찾을 필요 없음) */
 function pingScsbid() {
   var now = new Date();
   var bgn = new Date(now.getTime() - LOOKBACK_HOURS * 3600 * 1000);
   var ops = OP_CNSTWK.concat(OP_SERVC);
+  var out = '';
   for (var b = 0; b < BASE_CANDIDATES.length; b++) {
     for (var o = 0; o < ops.length; o++) {
       var url = BASE_CANDIDATES[b] + ops[o]
         + '?serviceKey=' + encodeURIComponent(SERVICE_KEY)
         + '&pageNo=1&numOfRows=1&inqryDiv=' + INQRY_DIV
         + '&inqryBgnDt=' + fmt(bgn) + '&inqryEndDt=' + fmt(now) + '&type=json';
+      out += '======================================================\n';
+      out += ops[o] + '  @  ' + BASE_CANDIDATES[b] + '\n';
       try {
         var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-        Logger.log('[' + r.getResponseCode() + '] ' + BASE_CANDIDATES[b] + ops[o]);
-        Logger.log('  ' + r.getContentText().substring(0, 900));
+        out += 'HTTP ' + r.getResponseCode() + '\n';
+        out += r.getContentText().substring(0, 1500) + '\n\n';
       } catch (e) {
-        Logger.log('예외 ' + ops[o] + ': ' + e);
+        out += '예외: ' + e + '\n\n';
       }
     }
   }
+  MailApp.sendEmail({
+    to: RECIPIENT,
+    subject: '[낙찰 진단] pingScsbid 결과 ' + ymd(now),
+    htmlBody: '<p>아래 내용을 Claude 채팅에 붙여넣어 주세요.</p><pre style="font-size:12px;white-space:pre-wrap;word-break:break-all">' + esc_(out) + '</pre>'
+  });
+  Logger.log('진단 메일 발송 완료 → ' + RECIPIENT);
 }
