@@ -31,8 +31,16 @@
 | `SERVICE_KEY` | (기존과 동일) | 공공데이터포털 일반 인증키(Decoding) |
 | `RECIPIENT` | `domoksu105@gmail.com` | 받을 이메일 |
 | `SEND_HOUR` | `18` | 매일 발송 시각(24h). 오전으로 바꾸려면 `9` 등으로 수정 |
-| `LOOKBACK_HOURS` | `26` | 조회 창(시간). 최근 N시간 개찰분 |
-| `INQRY_DIV` | `2` | 개찰일시 기준 조회 구분. `pingScsbid`로 확인 후 필요시 `1`로 |
+| `LOOKBACK_HOURS` | `26` | 조회 창(시간). 최근 N시간 등록된 낙찰분 |
+| `INQRY_DIV` | `1` | 낙찰정보 등록일시 기준(확정값). 날짜는 12자리(YYYYMMDDHHmm) 필수 |
+
+## 확정된 API 스펙 (검증 완료)
+
+- End Point: `https://apis.data.go.kr/1230000/as/ScsbidInfoService`
+- 오퍼레이션: `getScsbidListSttusCnstwk`(공사 낙찰현황) / `getScsbidListSttusServc`(용역 낙찰현황)
+- 파라미터: `inqryDiv=1`, `inqryBgnDt`/`inqryEndDt`=YYYYMMDDHHmm(12자리), `type=json`
+- 응답 필드: `bidwinnrNm`(낙찰업체) · `sucsfbidAmt`(낙찰금액) · `sucsfbidRate`(낙찰률) ·
+  `rlOpengDt`(실개찰일시) · `dminsttNm`(수요기관) · `bidNtceNm`(공고명)
 
 ## 대상 범위
 

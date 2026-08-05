@@ -38,9 +38,9 @@ var DOMAIN_EXCLUDE = ['전기','소방','통신','정보통신','전산','정보
 // 조회 창(시간). 개찰일시 기준으로 최근 N시간. 매일 실행이면 24~26 권장(겹치게 두면 누락↓)
 var LOOKBACK_HOURS = 26;
 
-// 개찰일시 기준 조회 구분값. 낙찰정보서비스는 보통 inqryDiv=1(공고게시일시)/2(개찰일시).
-// 최근 "개찰된" 결과를 받으려면 2가 맞으나, 서비스 버전에 따라 다를 수 있어 pingScsbid로 확인.
-var INQRY_DIV = 2;
+// 조회 구분값. 진단 결과 inqryDiv=1(낙찰정보 등록일시 기준) + 날짜 12자리(YYYYMMDDHHmm)가 정답.
+// (inqryDiv=2 및 8자리 날짜는 "DATE Format 에러"로 실패)
+var INQRY_DIV = 1;
 
 // 엔드포인트 후보(위→아래 순으로 시도, 먼저 성공하는 것 사용)
 // ※ 진단 결과 /as/ 경로가 정답(403=권한). 낙찰정보서비스 활용신청 승인 후 동작함.
@@ -48,9 +48,9 @@ var BASE_CANDIDATES = [
   'https://apis.data.go.kr/1230000/as/ScsbidInfoService/',
   'https://apis.data.go.kr/1230000/ScsbidInfoService/'
 ];
-// 카테고리별 오퍼레이션 후보(위→아래 순으로 시도). 낙찰현황이 없으면 개찰결과로 폴백.
-var OP_CNSTWK = ['getScsbidListSttusCnstwk', 'getOpengResultListInfoCnstwk'];
-var OP_SERVC  = ['getScsbidListSttusServc',  'getOpengResultListInfoServc'];
+// 카테고리별 오퍼레이션. 낙찰현황(getScsbidListSttus*)이 낙찰업체·금액·낙찰률을 바로 제공(정상 확인됨).
+var OP_CNSTWK = ['getScsbidListSttusCnstwk'];   // 공사 낙찰현황
+var OP_SERVC  = ['getScsbidListSttusServc'];    // 용역 낙찰현황
 // ======================================================
 
 
@@ -189,8 +189,17 @@ function amountOf_(it) {
   return (!isNaN(n) && n > 0) ? n : null;
 }
 function rateOf_(it)   { return pick_(it, ['sucsfbidRate','scsbidRate','bidwinnrRate','bidRate','sucbidRate','bidrt']); }
-function opengOf_(it)  { return pick_(it, ['opengDt','opengDate','bidClseDt']); }
-function urlOf_(it)    { return pick_(it, ['bidNtceDtlUrl','bidNtceUrl','ntceSpecDocUrl1']); }
+function opengOf_(it)  { return pick_(it, ['rlOpengDt','opengDt','opengDate','fnlSucsfDate','bidClseDt']); }
+function urlOf_(it) {
+  var u = pick_(it, ['bidNtceDtlUrl','bidNtceUrl','ntceSpecDocUrl1']);
+  if (u) return u;
+  // 낙찰현황엔 링크 필드가 없어 공고번호로 나라장터 원문 링크 생성
+  if (it.bidNtceNo) {
+    return 'https://www.g2b.go.kr/link/PNPE027_01/single/?bidPbancNo=' + it.bidNtceNo
+         + '&bidPbancOrd=' + (parseInt(it.bidNtceOrd, 10) || 0);
+  }
+  return '';
+}
 
 function hasKeyword_(name, list) {
   for (var i = 0; i < list.length; i++) if (name.indexOf(list[i]) >= 0) return true;
